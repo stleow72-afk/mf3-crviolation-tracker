@@ -3,7 +3,8 @@ import {
   Plus, Search, AlertTriangle, CheckCircle, XCircle, FileText, 
   Camera, User, Filter, MoreHorizontal, Save, Trash2, RefreshCw, 
   Calendar, Shield, Clock, FileCheck, History, Paperclip, 
-  ChevronRight, X, Printer, Eye, Hash, MapPin, LogIn, LogOut, Lock
+  ChevronRight, X, Printer, Eye, Hash, MapPin, LogIn, LogOut, Lock,
+  Download
 } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { 
@@ -60,15 +61,17 @@ export default function App() {
   const [view, setView] = useState('list');
   const [selectedViolation, setSelectedViolation] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [showReportPreview, setShowReportPreview] = useState(false);
   
   const [pendingStatus, setPendingStatus] = useState(null);
   const [statusNote, setStatusNote] = useState('');
   const [statusFile, setStatusFile] = useState(false);
 
+  // Default status set to 'Retraining'
   const [formData, setFormData] = useState({
     name: '', badgeId: '', department: '', cleanroomLevel: CLEANROOM_LEVELS[0],
     enforcerName: '', violationType: VIOLATION_TYPES[0], description: '',
-    actionTaken: ACTIONS[0], status: STATUSES[1].id, photoPlaceholder: false, violationDate: '' 
+    actionTaken: ACTIONS[0], status: STATUSES[0].id, photoPlaceholder: false, violationDate: '' 
   });
 
   useEffect(() => {
@@ -108,6 +111,9 @@ export default function App() {
   };
 
   const handleLogout = () => signOut(auth);
+  
+  // Triggers browser print dialog, which handles both printing and "Save as PDF"
+  const handlePrint = () => window.print();
 
   const handleInputChange = (e) => setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
   
@@ -132,7 +138,7 @@ export default function App() {
     if (!user || !pendingStatus) return;
     try {
       const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'mf3_violations', selectedViolation.id);
-      const historyEntry = { status: pendingStatus, timestamp: new Date().toISOString(), note: statusNote || 'Manual update', hasFile: statusFile };
+      const historyEntry = { status: pendingStatus, timestamp: new Date().toISOString(), note: statusNote, hasFile: statusFile };
       const updateData = { status: pendingStatus, statusHistory: arrayUnion(historyEntry) };
       await updateDoc(docRef, updateData);
       setPendingStatus(null);
@@ -140,11 +146,23 @@ export default function App() {
     } catch (error) { console.error(error); }
   };
 
-  const handleDelete = async (id) => { if (user && window.confirm("Delete record?")) { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'mf3_violations', id)); setSelectedViolation(null); }};
+  const handleDelete = async (id) => { 
+    if (!user) return;
+    // Added confirmation to prevent accidental deletion
+    if (window.confirm("Are you sure you want to PERMANENTLY DELETE this violation record? This action cannot be undone.")) { 
+      try {
+        await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'mf3_violations', id)); 
+        setSelectedViolation(null); 
+      } catch (error) {
+        console.error("Delete failed", error);
+        alert("Failed to delete record. You may not have permission.");
+      }
+    }
+  };
   
   const resetForm = () => {
     const now = new Date(); now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
-    setFormData({ name: '', badgeId: '', department: '', cleanroomLevel: CLEANROOM_LEVELS[0], enforcerName: '', violationType: VIOLATION_TYPES[0], description: '', actionTaken: ACTIONS[0], status: STATUSES[1].id, photoPlaceholder: false, violationDate: now.toISOString().slice(0, 16) });
+    setFormData({ name: '', badgeId: '', department: '', cleanroomLevel: CLEANROOM_LEVELS[0], enforcerName: '', violationType: VIOLATION_TYPES[0], description: '', actionTaken: ACTIONS[0], status: STATUSES[0].id, photoPlaceholder: false, violationDate: now.toISOString().slice(0, 16) });
   };
 
   const filteredViolations = useMemo(() => violations.filter(v => 
@@ -167,20 +185,21 @@ export default function App() {
               <Shield className="h-12 w-12 text-indigo-600" />
             </div>
           </div>
-          <h2 className="text-3xl font-black text-center text-slate-900 mb-1 leading-tight">Enforcer Access</h2>
-          <p className="text-center text-slate-500 mb-8 font-medium">MF3 Cleanroom Protocol System</p>
+          <h2 className="text-3xl font-black text-center text-slate-900 mb-1 leading-tight">MF3 Cleanroom</h2>
+          <p className="text-center text-slate-500 mb-8 font-medium">Protocol Violation Tracking System</p>
+          
           <form onSubmit={handleLogin} className="space-y-5">
             <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Officer ID (Email)</label>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Username (Email)</label>
               <input type="email" required className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-indigo-500 outline-none transition-all" placeholder="admin@mf3.com" value={email} onChange={e => setEmail(e.target.value)} />
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Passkey</label>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Password</label>
               <input type="password" required className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:border-indigo-500 outline-none transition-all" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} />
             </div>
             {loginError && <div className="text-red-600 text-sm font-bold bg-red-50 p-3 rounded-lg border border-red-100">{loginError}</div>}
             <button type="submit" className="w-full bg-indigo-600 text-white py-4 rounded-xl font-black text-lg hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition-all flex items-center justify-center gap-2">
-              <LogIn size={20} /> AUTHORIZE LOGIN
+              <LogIn size={20} /> LOG IN
             </button>
           </form>
         </div>
@@ -190,6 +209,34 @@ export default function App() {
 
   return (
     <div className="min-h-screen w-full bg-slate-50 flex flex-col text-slate-900 overflow-x-hidden">
+       {/* --- HIDDEN PRINT REPORT (Only visible when printing) --- */}
+       <div className="hidden print:block print:absolute print:inset-0 print:bg-white print:z-50 print:p-8 bg-white text-black">
+         {selectedViolation ? <PrintableReport data={selectedViolation} /> : <div className="p-10 text-center">Select a record to print.</div>}
+      </div>
+
+       {/* --- PREVIEW MODAL --- */}
+       {showReportPreview && selectedViolation && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 print:hidden backdrop-blur-sm">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl h-[90vh] flex flex-col overflow-hidden animate-fadeIn">
+            <div className="p-4 border-b flex justify-between items-center bg-gray-50">
+              <h2 className="font-bold text-gray-800 flex items-center gap-2"><FileText className="text-indigo-600" /> Report Preview</h2>
+              <div className="flex gap-2">
+                {/* Print Button */}
+                <button onClick={handlePrint} className="px-4 py-2 bg-indigo-600 text-white rounded-lg flex items-center gap-2 hover:bg-indigo-700 transition font-medium" title="Send to Printer">
+                  <Printer size={18} /> Print Report
+                </button>
+                {/* Save PDF Button - Triggers Print Dialog (Standard Web Behavior) */}
+                <button onClick={handlePrint} className="px-4 py-2 bg-emerald-600 text-white rounded-lg flex items-center gap-2 hover:bg-emerald-700 transition font-medium" title="Select 'Save as PDF' in the print dialog destination">
+                  <Download size={18} /> Save as PDF
+                </button>
+                <button onClick={() => setShowReportPreview(false)} className="p-2 hover:bg-gray-200 rounded-lg text-gray-500 transition"><X size={24} /></button>
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto p-8 bg-gray-100"><div className="shadow-lg bg-white mx-auto"><PrintableReport data={selectedViolation} /></div></div>
+          </div>
+        </div>
+      )}
+
       {/* HEADER */}
       <header className="bg-slate-900 text-white sticky top-0 z-30 border-b border-slate-800 shadow-xl">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-20 flex items-center justify-between">
@@ -233,7 +280,7 @@ export default function App() {
                   <input type="text" placeholder="Search by name, ID, or case number..." className="w-full pl-12 pr-4 py-3 bg-slate-50 border-none rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none font-medium" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
                 </div>
                 <button onClick={() => setView('form')} className="w-full sm:w-auto bg-indigo-600 text-white px-6 py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 flex-shrink-0">
-                  <Plus size={20} /> NEW LOG
+                  <Plus size={20} /> Log A New Report
                 </button>
               </div>
 
@@ -275,9 +322,14 @@ export default function App() {
                     <h2 className="font-black text-slate-900 flex items-center gap-2 uppercase tracking-widest text-[10px]">
                       <FileText size={16} className="text-indigo-600" /> Case Details
                     </h2>
-                    <button onClick={() => handleDelete(selectedViolation.id)} className="text-slate-400 hover:text-red-600 transition-colors p-1">
-                      <Trash2 size={20} />
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button onClick={() => setShowReportPreview(true)} className="flex items-center gap-2 bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider hover:bg-indigo-100 transition-colors" title="Generate Report">
+                         <Printer size={16} /> Generate Report
+                      </button>
+                      <button onClick={() => handleDelete(selectedViolation.id)} className="text-slate-400 hover:text-red-600 transition-colors p-1" title="Delete Record">
+                        <Trash2 size={20} />
+                      </button>
+                    </div>
                   </div>
                   
                   <div className="p-6 space-y-8 overflow-y-auto custom-scrollbar">
@@ -352,62 +404,88 @@ export default function App() {
           /* FORM VIEW */
           <div className="max-w-3xl mx-auto animate-in fade-in zoom-in-95 duration-300">
             <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden">
-              <div className="bg-slate-900 p-8 flex justify-between items-center text-white">
+              {/* UPDATED: ORANGE BANNER */}
+              <div className="bg-orange-500 p-8 border-b border-orange-600 flex justify-between items-center text-white">
                 <div className="flex items-center gap-4">
-                  <div className="bg-indigo-600 p-3 rounded-2xl"><Shield size={28}/></div>
-                  <h2 className="text-2xl font-black uppercase tracking-tight">LOG PROTOCOL BREACH</h2>
+                  <div className="bg-white/20 text-white p-3 rounded-2xl"><Shield size={28}/></div>
+                  <h2 className="text-2xl font-black uppercase tracking-tight text-white">Log Protocol Violation</h2>
                 </div>
-                <button onClick={() => setView('list')} className="text-slate-400 hover:text-white transition-colors"><XCircle size={32}/></button>
+                <button onClick={() => setView('list')} className="text-white/70 hover:text-white transition-colors"><XCircle size={32}/></button>
               </div>
               
               <form onSubmit={handleSubmit} className="p-8 space-y-8">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                   <div className="space-y-2">
                     <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Violator Full Name</label>
-                    <input required name="name" value={formData.name} onChange={handleInputChange} className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-xl focus:border-indigo-500 outline-none transition-all font-bold" />
+                    <input required name="name" value={formData.name} onChange={handleInputChange} className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-xl focus:border-indigo-500 outline-none transition-all" />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Badge / IC / Passport #</label>
-                    <input required name="badgeId" value={formData.badgeId} onChange={handleInputChange} className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-xl focus:border-indigo-500 outline-none transition-all font-mono font-bold" />
+                    <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Employee#/IC or Passport#(Vendor)</label>
+                    <input required name="badgeId" value={formData.badgeId} onChange={handleInputChange} className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-xl focus:border-indigo-500 outline-none transition-all font-mono" />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-8">
+                  <div className="space-y-2">
+                    <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Department/Company(Vendor)</label>
+                    <input required name="department" value={formData.department} onChange={handleInputChange} className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-xl focus:border-indigo-500 outline-none transition-all" />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                    <div className="space-y-2">
                     <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Cleanroom Level</label>
-                    <select name="cleanroomLevel" value={formData.cleanroomLevel} onChange={handleInputChange} className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-xl focus:border-indigo-500 outline-none transition-all font-bold appearance-none">
+                    <select name="cleanroomLevel" value={formData.cleanroomLevel} onChange={handleInputChange} className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-xl focus:border-indigo-500 outline-none transition-all appearance-none">
                       {CLEANROOM_LEVELS.map(l => <option key={l} value={l}>MF3 - Level {l}</option>)}
                     </select>
                   </div>
                   <div className="space-y-2">
                     <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Violation Type</label>
-                    <select name="violationType" value={formData.violationType} onChange={handleInputChange} className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-xl focus:border-indigo-500 outline-none transition-all font-bold appearance-none">
+                    <select name="violationType" value={formData.violationType} onChange={handleInputChange} className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-xl focus:border-indigo-500 outline-none transition-all appearance-none">
                       {VIOLATION_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                   <div className="space-y-2">
+                    <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Action Taken (Penalty)</label>
+                    <select name="actionTaken" value={formData.actionTaken} onChange={handleInputChange} className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-xl focus:border-indigo-500 outline-none transition-all appearance-none">
+                      {ACTIONS.map(a => <option key={a} value={a}>{a}</option>)}
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Initial Workflow Status</label>
+                    <select name="status" value={formData.status} onChange={handleInputChange} className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-xl focus:border-indigo-500 outline-none transition-all appearance-none">
+                      {STATUSES.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
                     </select>
                   </div>
                 </div>
 
                 <div className="space-y-2">
                   <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Description of Incident</label>
-                  <textarea required name="description" value={formData.description} onChange={handleInputChange} className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-xl focus:border-indigo-500 outline-none transition-all font-medium h-32" placeholder="Provide details of the breach..." />
+                  <textarea required name="description" value={formData.description} onChange={handleInputChange} className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-xl focus:border-indigo-500 outline-none transition-all h-32" placeholder="Provide details of the breach..." />
                 </div>
 
                 <div className="p-6 bg-indigo-50 rounded-2xl border-2 border-indigo-100 grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Enforcer ID</label>
-                    <input required name="enforcerName" value={formData.enforcerName} onChange={handleInputChange} className="w-full px-4 py-2 bg-white border-none rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-sm" />
+                    <label className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Enforcer Name</label>
+                    <input required name="enforcerName" value={formData.enforcerName} onChange={handleInputChange} className="w-full px-4 py-2 bg-white border-none rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm" />
                   </div>
                   <div className="space-y-2">
                     <label className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Incident Timestamp</label>
-                    <input required type="datetime-local" name="violationDate" value={formData.violationDate} onChange={handleInputChange} className="w-full px-4 py-2 bg-white border-none rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-sm" />
+                    <input required type="datetime-local" name="violationDate" value={formData.violationDate} onChange={handleInputChange} className="w-full px-4 py-2 bg-white border-none rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm" />
                   </div>
                 </div>
 
-                <div className="flex gap-4 pt-4">
-                   <button type="button" onClick={() => setView('list')} className="flex-1 px-8 py-4 border-2 border-slate-100 text-slate-400 font-black rounded-2xl hover:bg-slate-50 transition-all uppercase tracking-widest">Cancel</button>
-                   <button type="submit" className="flex-[2] bg-indigo-600 text-white px-8 py-4 rounded-2xl font-black text-lg hover:bg-indigo-700 shadow-xl shadow-indigo-100 transition-all flex items-center justify-center gap-3">
-                     <Save size={24}/> LOG VIOLATION
-                   </button>
+                <div className="flex flex-col items-center">
+                    <p className="text-xs text-red-500 font-bold mb-4 uppercase tracking-widest animate-pulse">Reminder: Upload evident/photo into SharePoint folder</p>
+                    <div className="flex w-full gap-4">
+                        <button type="button" onClick={() => setView('list')} className="flex-1 px-8 py-4 border-2 border-slate-100 text-slate-400 font-black rounded-2xl hover:bg-slate-50 transition-all uppercase tracking-widest">Cancel</button>
+                        <button type="submit" className="flex-[2] bg-indigo-600 text-white px-8 py-4 rounded-2xl font-black text-lg hover:bg-indigo-700 shadow-xl shadow-indigo-100 transition-all flex items-center justify-center gap-3">
+                            <Save size={24}/> LOG VIOLATION
+                        </button>
+                    </div>
                 </div>
               </form>
             </div>
@@ -424,5 +502,34 @@ function StatusBadge({ id }) {
     <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border-2 shadow-sm whitespace-nowrap ${config.color}`}>
       {config.label}
     </span>
+  );
+}
+
+function PrintableReport({ data }) {
+  if (!data) return null;
+  return (
+    <div className="max-w-[210mm] mx-auto border border-gray-300 p-12 min-h-screen">
+      <div className="text-center border-b-2 border-gray-800 pb-6 mb-8">
+        <div className="flex justify-center items-center mb-4">
+          <Shield className="h-10 w-10 text-blue-800 mr-2" />
+          <h1 className="text-3xl font-bold uppercase tracking-widest text-blue-800">Confidential</h1>
+        </div>
+        <h2 className="text-xl font-bold uppercase text-blue-800">Cleanroom Protocol Violation Report</h2>
+        <p className="text-sm text-gray-500 mt-1">Cleanroom Protocol Enforcing Committee (MF3)</p>
+      </div>
+      <div className="flex justify-between items-end mb-8 text-sm"><div><span className="font-bold text-gray-500 uppercase">Case Reference ID:</span><div className="font-mono text-lg font-bold text-gray-900">{data.caseId || data.id}</div></div><div className="text-right"><span className="font-bold text-gray-500 uppercase">Report Generated:</span><div className="text-gray-900">{new Date().toLocaleString()}</div></div></div>
+      <div className="mb-8"><h3 className="bg-gray-100 border border-gray-300 px-4 py-2 font-bold text-sm uppercase text-gray-800 mb-4">A. Violator Information</h3><div className="grid grid-cols-2 gap-6"><div><label className="block text-xs font-bold text-gray-500 uppercase">Name</label><div className="border-b border-gray-300 py-1 text-gray-900 font-medium">{data.name}</div></div><div><label className="block text-xs font-bold text-gray-500 uppercase">Employee ID / IC / Passport</label><div className="border-b border-gray-300 py-1 text-gray-900 font-medium">{data.badgeId}</div></div><div className="col-span-2"><label className="block text-xs font-bold text-gray-500 uppercase">Department / Company (Vendor)</label><div className="border-b border-gray-300 py-1 text-gray-900 font-medium">{data.department}</div></div></div></div>
+      <div className="mb-8"><h3 className="bg-gray-100 border border-gray-300 px-4 py-2 font-bold text-sm uppercase text-gray-800 mb-4">B. Violation Particulars</h3><div className="grid grid-cols-2 gap-6 mb-4"><div><label className="block text-xs font-bold text-gray-500 uppercase">Date & Time of Violation</label><div className="border-b border-gray-300 py-1 text-gray-900">{data.violationDate ? new Date(data.violationDate).toLocaleString() : 'N/A'}</div></div><div><label className="block text-xs font-bold text-gray-500 uppercase">Reported By (Enforcer)</label><div className="border-b border-gray-300 py-1 text-gray-900">{data.enforcerName}</div></div></div><div className="grid grid-cols-2 gap-6 mb-4"><div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">Violation Type</label><div className="p-2 border border-red-200 bg-red-50 text-red-800 font-bold rounded text-sm inline-block">{data.violationType}</div></div><div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">Cleanroom Level</label><div className="p-2 border border-blue-200 bg-blue-50 text-blue-800 font-bold rounded text-sm inline-block">MF3 Cleanroom - {data.cleanroomLevel || 'N/A'}</div></div></div><div className="mb-4"><label className="block text-xs font-bold text-gray-500 uppercase mb-1">Action Taken</label><div className="border-b border-gray-300 py-1 text-gray-900 font-medium">{data.actionTaken}</div></div><div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">Description of Incident</label><div className="p-4 border border-gray-300 rounded bg-gray-50 text-gray-800 text-sm leading-relaxed min-h-[80px]">{data.description}</div></div></div>
+      <div className="mb-8 avoid-break">
+        <h3 className="bg-gray-100 border border-gray-300 px-4 py-2 font-bold text-sm uppercase text-gray-800 mb-4">C. Remarks</h3>
+        <div className="border-2 border-gray-300 border-dashed rounded p-6 bg-gray-50 text-center">
+            <p className="text-gray-600 font-medium italic">
+                "Photographic evidence may available in SharePoint folder, please contact MF3 Cleanroom Protocol Enforcing Committee to view it"
+            </p>
+        </div>
+      </div>
+      <div className="mt-12 pt-8 border-t-2 border-gray-200 avoid-break"><div className="grid grid-cols-3 gap-8"><div className="text-center"><div className="h-20 border-b border-gray-400 mb-2"></div><div className="text-xs font-bold uppercase text-gray-500">Violator Signature</div><div className="text-xs text-gray-400">Acknowledging Violation</div></div><div className="text-center"><div className="h-20 border-b border-gray-400 mb-2"></div><div className="text-xs font-bold uppercase text-gray-500">Enforcer Signature</div><div className="text-xs text-gray-400">Verifying Report</div></div><div className="text-center"><div className="h-20 border-b border-gray-400 mb-2"></div><div className="text-xs font-bold uppercase text-gray-500">Manager / HOD</div><div className="text-xs text-gray-400">Acknowledging Receipt</div></div></div></div>
+      <div className="mt-12 text-center text-[10px] text-gray-400"><p>This document is generated by the MF3 Cleanroom Protocol Enforcement System.</p><p>Strictly Confidential. For Internal Use Only.</p></div>
+    </div>
   );
 }
