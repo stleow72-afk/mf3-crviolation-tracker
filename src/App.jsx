@@ -4,7 +4,7 @@ import {
   Camera, User, Filter, MoreHorizontal, Save, Trash2, RefreshCw, 
   Calendar, Shield, Clock, FileCheck, History, Paperclip, 
   ChevronRight, X, Printer, Eye, Hash, MapPin, LogIn, LogOut, Lock,
-  Download, Pencil
+  Download, Pencil, Triangle
 } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { 
@@ -333,8 +333,8 @@ export default function App() {
                   <div key={v.id} onClick={() => setSelectedViolation(v)} className={`bg-white p-5 rounded-2xl border-2 cursor-pointer transition-all hover:shadow-md ${selectedViolation?.id === v.id ? 'border-indigo-500 shadow-indigo-50 shadow-lg scale-[1.01]' : 'border-transparent shadow-sm'}`}>
                     <div className="flex justify-between items-start gap-4">
                       <div className="flex gap-4">
-                        <div className={`p-3 rounded-xl flex-shrink-0 h-fit ${v.violationType.includes('Serious') ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-600'}`}>
-                          <AlertTriangle size={24} />
+                        <div className="p-3 rounded-xl flex-shrink-0 h-fit bg-slate-100 text-slate-400">
+                          <Triangle size={24} />
                         </div>
                         <div>
                           <div className="flex items-center gap-2 mb-1">
