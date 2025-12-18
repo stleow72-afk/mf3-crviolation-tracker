@@ -110,7 +110,7 @@ export default function App() {
       setLoading(false);
     });
     return () => unsubscribeData();
-  }, [user, selectedViolation?.id]); // Added selectedViolation?.id dependency to ensure refresh logic works
+  }, [user, selectedViolation?.id]); 
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -183,8 +183,6 @@ export default function App() {
   };
 
   const initiateStatusUpdate = (statusId) => { 
-    // Removed the restriction: if (statusId !== selectedViolation.status)
-    // Now allows selecting any status to add notes or re-confirm
     setPendingStatus(statusId); 
     setStatusNote(''); 
     setStatusFile(false); 
@@ -198,7 +196,6 @@ export default function App() {
       const updateData = { status: pendingStatus, statusHistory: arrayUnion(historyEntry) };
       await updateDoc(docRef, updateData);
       setPendingStatus(null);
-      // Local update handles via onSnapshot, but we can optimistically update selectedViolation too
       setSelectedViolation({...selectedViolation, status: pendingStatus, statusHistory: [...(selectedViolation.statusHistory || []), historyEntry]});
     } catch (error) { console.error(error); }
   };
@@ -400,16 +397,22 @@ export default function App() {
                     <div>
                       <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Workflow Actions</label>
                       <div className="space-y-2">
-                        {STATUSES.map(s => (
-                          <button 
-                            key={s.id} 
-                            onClick={() => initiateStatusUpdate(s.id)}
-                            className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border-2 transition-all font-bold text-xs ${selectedViolation.status === s.id ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg' : 'bg-white border-slate-100 text-slate-600 hover:border-indigo-200'}`}
-                          >
-                            {s.label}
-                            {selectedViolation.status === s.id && <CheckCircle size={16} />}
-                          </button>
-                        ))}
+                        {STATUSES.map(s => {
+                          // Logic for highlighting the selected status button
+                          // Highlights if it matches the current pending selection (prioritized) 
+                          // OR if it matches the current status AND no pending selection is made
+                          const isSelected = pendingStatus ? pendingStatus === s.id : selectedViolation.status === s.id;
+                          return (
+                            <button 
+                              key={s.id} 
+                              onClick={() => initiateStatusUpdate(s.id)}
+                              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border-2 transition-all font-bold text-xs ${isSelected ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg' : 'bg-white border-slate-100 text-slate-600 hover:border-indigo-200'}`}
+                            >
+                              {s.label}
+                              {isSelected && <CheckCircle size={16} />}
+                            </button>
+                          );
+                        })}
                       </div>
                     </div>
 
@@ -585,8 +588,9 @@ function PrintableReport({ data }) {
       <div className="mb-8"><h3 className="bg-gray-100 border border-gray-300 px-4 py-2 font-bold text-sm uppercase text-gray-800 mb-4">B. Violation Particulars</h3><div className="grid grid-cols-2 gap-6 mb-4"><div><label className="block text-xs font-bold text-gray-500 uppercase">Date & Time of Violation</label><div className="border-b border-gray-300 py-1 text-gray-900">{data.violationDate ? new Date(data.violationDate).toLocaleString() : 'N/A'}</div></div><div><label className="block text-xs font-bold text-gray-500 uppercase">Reported By (Enforcer)</label><div className="border-b border-gray-300 py-1 text-gray-900">{data.enforcerName}</div></div></div><div className="grid grid-cols-2 gap-6 mb-4"><div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">Violation Type</label><div className="p-2 border border-red-200 bg-red-50 text-red-800 font-bold rounded text-sm inline-block">{data.violationType}</div></div><div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">Cleanroom Level</label><div className="p-2 border border-blue-200 bg-blue-50 text-blue-800 font-bold rounded text-sm inline-block">MF3 Cleanroom - {data.cleanroomLevel || 'N/A'}</div></div></div><div className="mb-4"><label className="block text-xs font-bold text-gray-500 uppercase mb-1">Action Taken</label><div className="border-b border-gray-300 py-1 text-gray-900 font-medium">{data.actionTaken}</div></div><div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">Description of Incident</label><div className="p-4 border border-gray-300 rounded bg-gray-50 text-gray-800 text-sm leading-relaxed min-h-[80px]">{data.description}</div></div></div>
       <div className="mb-8 avoid-break">
         <h3 className="bg-gray-100 border border-gray-300 px-4 py-2 font-bold text-sm uppercase text-gray-800 mb-4">C. Remarks</h3>
-        <div className="border-2 border-gray-300 border-dashed rounded p-6 bg-gray-50 text-center">
-            <p className="text-gray-600 font-medium italic">
+        {/* UPDATED: Green Box for Remarks */}
+        <div className="border-2 border-green-200 border-dashed rounded p-6 bg-green-50 text-center">
+            <p className="text-green-800 font-medium italic">
                 "Photographic evidence may available in SharePoint folder, please contact MF3 Cleanroom Protocol Enforcing Committee to view it"
             </p>
         </div>
