@@ -4,7 +4,7 @@ import {
   Camera, User, Filter, MoreHorizontal, Save, Trash2, RefreshCw, 
   Calendar, Shield, Clock, FileCheck, History, Paperclip, 
   ChevronRight, X, Printer, Eye, Hash, MapPin, LogIn, LogOut, Lock,
-  Download
+  Download, Pencil
 } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { 
@@ -67,7 +67,10 @@ export default function App() {
   const [statusNote, setStatusNote] = useState('');
   const [statusFile, setStatusFile] = useState(false);
 
-  // UPDATED: Default status is now empty string to force selection
+  // --- Edit Mode States ---
+  const [isEditing, setIsEditing] = useState(false);
+  const [editId, setEditId] = useState(null);
+
   const [formData, setFormData] = useState({
     name: '', badgeId: '', department: '', cleanroomLevel: CLEANROOM_LEVELS[0],
     enforcerName: '', violationType: VIOLATION_TYPES[0], description: '',
@@ -92,13 +95,22 @@ export default function App() {
       }));
       items.sort((a, b) => b.timestamp - a.timestamp);
       setViolations(items);
+      
+      // Auto-refresh selected violation if it exists in the new data
+      if (selectedViolation) {
+        const updatedRecord = items.find(i => i.id === selectedViolation.id);
+        if (updatedRecord) {
+            setSelectedViolation(updatedRecord);
+        }
+      }
+      
       setLoading(false);
     }, (error) => {
       console.error("Error fetching data:", error);
       setLoading(false);
     });
     return () => unsubscribeData();
-  }, [user]); 
+  }, [user, selectedViolation?.id]); // Added selectedViolation?.id dependency to ensure refresh logic works
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -111,28 +123,72 @@ export default function App() {
   };
 
   const handleLogout = () => signOut(auth);
-  
-  // Triggers browser print dialog
   const handlePrint = () => window.print();
-
   const handleInputChange = (e) => setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
   
+  // --- Handle Edit Mode ---
+  const handleEdit = (violation) => {
+    setFormData({
+      name: violation.name,
+      badgeId: violation.badgeId,
+      department: violation.department || '',
+      cleanroomLevel: violation.cleanroomLevel || CLEANROOM_LEVELS[0],
+      enforcerName: violation.enforcerName,
+      violationType: violation.violationType || VIOLATION_TYPES[0],
+      description: violation.description,
+      actionTaken: violation.actionTaken || ACTIONS[0],
+      status: violation.status, // Load current status for correction
+      photoPlaceholder: violation.statusHistory?.[0]?.hasFile || false, 
+      violationDate: violation.violationDate
+    });
+    setEditId(violation.id);
+    setIsEditing(true);
+    setView('form');
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!user) return;
     try {
-      const maxCaseNumber = violations.reduce((max, v) => (v.caseNumber || 0) > max ? (v.caseNumber || 0) : max, 0);
-      const nextCaseNumber = maxCaseNumber + 1;
-      const caseIdString = `CR-${String(nextCaseNumber).padStart(6, '0')}`;
-      const initialHistory = [{ status: formData.status, timestamp: new Date().toISOString(), note: 'Initial Violation Logged', hasFile: formData.photoPlaceholder }];
-      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'mf3_violations'), {
-        ...formData, caseNumber: nextCaseNumber, caseId: caseIdString, timestamp: serverTimestamp(), enforcerId: user.uid, statusHistory: initialHistory, newCertAttached: false
-      });
-      resetForm(); setView('list');
+      if (isEditing && editId) {
+        // --- UPDATE EXISTING RECORD ---
+        const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'mf3_violations', editId);
+        await updateDoc(docRef, {
+           name: formData.name,
+           badgeId: formData.badgeId,
+           department: formData.department,
+           cleanroomLevel: formData.cleanroomLevel,
+           enforcerName: formData.enforcerName,
+           violationType: formData.violationType,
+           description: formData.description,
+           actionTaken: formData.actionTaken,
+           status: formData.status, // Update current status (correction)
+           violationDate: formData.violationDate
+        });
+        setIsEditing(false);
+        setEditId(null);
+      } else {
+        // --- CREATE NEW RECORD ---
+        const maxCaseNumber = violations.reduce((max, v) => (v.caseNumber || 0) > max ? (v.caseNumber || 0) : max, 0);
+        const nextCaseNumber = maxCaseNumber + 1;
+        const caseIdString = `CR-${String(nextCaseNumber).padStart(6, '0')}`;
+        const initialHistory = [{ status: formData.status, timestamp: new Date().toISOString(), note: 'Initial Violation Logged', hasFile: formData.photoPlaceholder }];
+        await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'mf3_violations'), {
+          ...formData, caseNumber: nextCaseNumber, caseId: caseIdString, timestamp: serverTimestamp(), enforcerId: user.uid, statusHistory: initialHistory, newCertAttached: false
+        });
+      }
+      resetForm(); 
+      setView('list');
     } catch (error) { alert("Failed to save violation."); }
   };
 
-  const initiateStatusUpdate = (statusId) => { if (statusId !== selectedViolation.status) { setPendingStatus(statusId); setStatusNote(''); setStatusFile(false); }};
+  const initiateStatusUpdate = (statusId) => { 
+    // Removed the restriction: if (statusId !== selectedViolation.status)
+    // Now allows selecting any status to add notes or re-confirm
+    setPendingStatus(statusId); 
+    setStatusNote(''); 
+    setStatusFile(false); 
+  };
   
   const confirmStatusUpdate = async () => {
     if (!user || !pendingStatus) return;
@@ -142,27 +198,16 @@ export default function App() {
       const updateData = { status: pendingStatus, statusHistory: arrayUnion(historyEntry) };
       await updateDoc(docRef, updateData);
       setPendingStatus(null);
-      setSelectedViolation({...selectedViolation, status: pendingStatus, statusHistory: [...selectedViolation.statusHistory, historyEntry]});
+      // Local update handles via onSnapshot, but we can optimistically update selectedViolation too
+      setSelectedViolation({...selectedViolation, status: pendingStatus, statusHistory: [...(selectedViolation.statusHistory || []), historyEntry]});
     } catch (error) { console.error(error); }
   };
 
-  const handleDelete = async (id) => { 
-    if (!user) return;
-    if (window.confirm("Are you sure you want to PERMANENTLY DELETE this violation record? This action cannot be undone.")) { 
-      try {
-        await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'mf3_violations', id)); 
-        setSelectedViolation(null); 
-      } catch (error) {
-        console.error("Delete failed", error);
-        alert("Failed to delete record. You may not have permission.");
-      }
-    }
-  };
-  
   const resetForm = () => {
     const now = new Date(); now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
-    // UPDATED: Reset status to empty string
     setFormData({ name: '', badgeId: '', department: '', cleanroomLevel: CLEANROOM_LEVELS[0], enforcerName: '', violationType: VIOLATION_TYPES[0], description: '', actionTaken: ACTIONS[0], status: "", photoPlaceholder: false, violationDate: now.toISOString().slice(0, 16) });
+    setIsEditing(false);
+    setEditId(null);
   };
 
   const filteredViolations = useMemo(() => violations.filter(v => 
@@ -230,7 +275,6 @@ export default function App() {
                 <button onClick={() => setShowReportPreview(false)} className="p-2 hover:bg-gray-200 rounded-lg text-gray-500 transition"><X size={24} /></button>
               </div>
             </div>
-            {/* Added extra padding-bottom to ensure scrolling allows full view */}
             <div className="flex-1 overflow-y-auto p-8 bg-gray-100 pb-20">
               <div className="shadow-lg bg-white mx-auto w-[210mm] min-h-[297mm]">
                 <PrintableReport data={selectedViolation} />
@@ -282,7 +326,7 @@ export default function App() {
                   <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
                   <input type="text" placeholder="Search by name, ID, or case number..." className="w-full pl-12 pr-4 py-3 bg-slate-50 border-none rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none font-medium" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
                 </div>
-                <button onClick={() => setView('form')} className="w-full sm:w-auto bg-indigo-600 text-white px-6 py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 flex-shrink-0">
+                <button onClick={() => { resetForm(); setView('form'); }} className="w-full sm:w-auto bg-indigo-600 text-white px-6 py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 flex-shrink-0">
                   <Plus size={20} /> Log A New Report
                 </button>
               </div>
@@ -329,8 +373,8 @@ export default function App() {
                       <button onClick={() => setShowReportPreview(true)} className="flex items-center gap-2 bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider hover:bg-indigo-100 transition-colors" title="Generate Report">
                          <Printer size={16} /> Generate Report
                       </button>
-                      <button onClick={() => handleDelete(selectedViolation.id)} className="text-slate-400 hover:text-red-600 transition-colors p-1" title="Delete Record">
-                        <Trash2 size={20} />
+                      <button onClick={() => handleEdit(selectedViolation)} className="text-slate-400 hover:text-blue-600 transition-colors p-1" title="Edit Record">
+                        <Pencil size={20} />
                       </button>
                     </div>
                   </div>
@@ -404,14 +448,15 @@ export default function App() {
             </div>
           </div>
         ) : (
-          /* FORM VIEW */
+          /* FORM VIEW (Used for Create AND Edit) */
           <div className="max-w-3xl mx-auto animate-in fade-in zoom-in-95 duration-300">
             <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden">
-              {/* UPDATED: ORANGE BANNER */}
+              {/* ORANGE BANNER */}
               <div className="bg-orange-500 p-8 border-b border-orange-600 flex justify-between items-center text-white">
                 <div className="flex items-center gap-4">
                   <div className="bg-white/20 text-white p-3 rounded-2xl"><Shield size={28}/></div>
-                  <h2 className="text-2xl font-black uppercase tracking-tight text-white">Log Protocol Violation</h2>
+                  {/* DYNAMIC TITLE */}
+                  <h2 className="text-2xl font-black uppercase tracking-tight text-white">{isEditing ? 'Edit Protocol Violation' : 'Log Protocol Violation'}</h2>
                 </div>
                 <button onClick={() => setView('list')} className="text-white/70 hover:text-white transition-colors"><XCircle size={32}/></button>
               </div>
@@ -459,7 +504,6 @@ export default function App() {
                   </div>
                   <div className="space-y-2">
                     <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Initial Workflow Status</label>
-                    {/* UPDATED: Dropdown allows empty selection initially */}
                     <select required name="status" value={formData.status} onChange={handleInputChange} className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-xl focus:border-indigo-500 outline-none transition-all appearance-none">
                       <option value="" disabled>Select Status...</option>
                       {STATUSES.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
@@ -486,9 +530,9 @@ export default function App() {
                 <div className="flex flex-col items-center">
                     <p className="text-xs text-red-500 font-bold mb-4 uppercase tracking-widest animate-pulse">Reminder: Upload evident/photo into SharePoint folder</p>
                     <div className="flex w-full gap-4">
-                        <button type="button" onClick={() => setView('list')} className="flex-1 px-8 py-4 border-2 border-slate-100 text-slate-400 font-black rounded-2xl hover:bg-slate-50 transition-all uppercase tracking-widest">Cancel</button>
+                        <button type="button" onClick={() => { resetForm(); setView('list'); }} className="flex-1 px-8 py-4 border-2 border-slate-100 text-slate-400 font-black rounded-2xl hover:bg-slate-50 transition-all uppercase tracking-widest">Cancel</button>
                         <button type="submit" className="flex-[2] bg-indigo-600 text-white px-8 py-4 rounded-2xl font-black text-lg hover:bg-indigo-700 shadow-xl shadow-indigo-100 transition-all flex items-center justify-center gap-3">
-                            <Save size={24}/> LOG VIOLATION
+                            <Save size={24}/> {isEditing ? 'UPDATE RECORD' : 'LOG VIOLATION'}
                         </button>
                     </div>
                 </div>
