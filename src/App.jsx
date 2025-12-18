@@ -67,11 +67,11 @@ export default function App() {
   const [statusNote, setStatusNote] = useState('');
   const [statusFile, setStatusFile] = useState(false);
 
-  // Default status set to 'Retraining'
+  // UPDATED: Default status is now empty string to force selection
   const [formData, setFormData] = useState({
     name: '', badgeId: '', department: '', cleanroomLevel: CLEANROOM_LEVELS[0],
     enforcerName: '', violationType: VIOLATION_TYPES[0], description: '',
-    actionTaken: ACTIONS[0], status: STATUSES[0].id, photoPlaceholder: false, violationDate: '' 
+    actionTaken: ACTIONS[0], status: "", photoPlaceholder: false, violationDate: '' 
   });
 
   useEffect(() => {
@@ -112,7 +112,7 @@ export default function App() {
 
   const handleLogout = () => signOut(auth);
   
-  // Triggers browser print dialog, which handles both printing and "Save as PDF"
+  // Triggers browser print dialog
   const handlePrint = () => window.print();
 
   const handleInputChange = (e) => setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
@@ -148,7 +148,6 @@ export default function App() {
 
   const handleDelete = async (id) => { 
     if (!user) return;
-    // Added confirmation to prevent accidental deletion
     if (window.confirm("Are you sure you want to PERMANENTLY DELETE this violation record? This action cannot be undone.")) { 
       try {
         await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'mf3_violations', id)); 
@@ -162,7 +161,8 @@ export default function App() {
   
   const resetForm = () => {
     const now = new Date(); now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
-    setFormData({ name: '', badgeId: '', department: '', cleanroomLevel: CLEANROOM_LEVELS[0], enforcerName: '', violationType: VIOLATION_TYPES[0], description: '', actionTaken: ACTIONS[0], status: STATUSES[0].id, photoPlaceholder: false, violationDate: now.toISOString().slice(0, 16) });
+    // UPDATED: Reset status to empty string
+    setFormData({ name: '', badgeId: '', department: '', cleanroomLevel: CLEANROOM_LEVELS[0], enforcerName: '', violationType: VIOLATION_TYPES[0], description: '', actionTaken: ACTIONS[0], status: "", photoPlaceholder: false, violationDate: now.toISOString().slice(0, 16) });
   };
 
   const filteredViolations = useMemo(() => violations.filter(v => 
@@ -209,8 +209,8 @@ export default function App() {
 
   return (
     <div className="min-h-screen w-full bg-slate-50 flex flex-col text-slate-900 overflow-x-hidden">
-       {/* --- HIDDEN PRINT REPORT (Only visible when printing) --- */}
-       <div className="hidden print:block print:absolute print:inset-0 print:bg-white print:z-50 print:p-8 bg-white text-black">
+       {/* --- HIDDEN PRINT REPORT --- */}
+       <div className="hidden print:block print:absolute print:inset-0 print:bg-white print:z-50 print:p-0 bg-white text-black">
          {selectedViolation ? <PrintableReport data={selectedViolation} /> : <div className="p-10 text-center">Select a record to print.</div>}
       </div>
 
@@ -221,18 +221,21 @@ export default function App() {
             <div className="p-4 border-b flex justify-between items-center bg-gray-50">
               <h2 className="font-bold text-gray-800 flex items-center gap-2"><FileText className="text-indigo-600" /> Report Preview</h2>
               <div className="flex gap-2">
-                {/* Print Button */}
                 <button onClick={handlePrint} className="px-4 py-2 bg-indigo-600 text-white rounded-lg flex items-center gap-2 hover:bg-indigo-700 transition font-medium" title="Send to Printer">
                   <Printer size={18} /> Print Report
                 </button>
-                {/* Save PDF Button - Triggers Print Dialog (Standard Web Behavior) */}
                 <button onClick={handlePrint} className="px-4 py-2 bg-emerald-600 text-white rounded-lg flex items-center gap-2 hover:bg-emerald-700 transition font-medium" title="Select 'Save as PDF' in the print dialog destination">
                   <Download size={18} /> Save as PDF
                 </button>
                 <button onClick={() => setShowReportPreview(false)} className="p-2 hover:bg-gray-200 rounded-lg text-gray-500 transition"><X size={24} /></button>
               </div>
             </div>
-            <div className="flex-1 overflow-y-auto p-8 bg-gray-100"><div className="shadow-lg bg-white mx-auto"><PrintableReport data={selectedViolation} /></div></div>
+            {/* Added extra padding-bottom to ensure scrolling allows full view */}
+            <div className="flex-1 overflow-y-auto p-8 bg-gray-100 pb-20">
+              <div className="shadow-lg bg-white mx-auto w-[210mm] min-h-[297mm]">
+                <PrintableReport data={selectedViolation} />
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -456,7 +459,9 @@ export default function App() {
                   </div>
                   <div className="space-y-2">
                     <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Initial Workflow Status</label>
-                    <select name="status" value={formData.status} onChange={handleInputChange} className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-xl focus:border-indigo-500 outline-none transition-all appearance-none">
+                    {/* UPDATED: Dropdown allows empty selection initially */}
+                    <select required name="status" value={formData.status} onChange={handleInputChange} className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-xl focus:border-indigo-500 outline-none transition-all appearance-none">
+                      <option value="" disabled>Select Status...</option>
                       {STATUSES.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
                     </select>
                   </div>
@@ -492,6 +497,20 @@ export default function App() {
           </div>
         )}
       </main>
+      
+      {/* Styles for A4 Printing */}
+      <style>{`
+        @media print {
+          @page {
+            size: A4;
+            margin: 0;
+          }
+          body {
+            print-color-adjust: exact;
+            -webkit-print-color-adjust: exact;
+          }
+        }
+      `}</style>
     </div>
   );
 }
@@ -508,7 +527,7 @@ function StatusBadge({ id }) {
 function PrintableReport({ data }) {
   if (!data) return null;
   return (
-    <div className="max-w-[210mm] mx-auto border border-gray-300 p-12 min-h-screen">
+    <div className="w-[210mm] min-h-[297mm] mx-auto bg-white border border-gray-300 p-12 print:border-none print:shadow-none">
       <div className="text-center border-b-2 border-gray-800 pb-6 mb-8">
         <div className="flex justify-center items-center mb-4">
           <Shield className="h-10 w-10 text-blue-800 mr-2" />
