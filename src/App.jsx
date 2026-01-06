@@ -35,8 +35,14 @@ const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 
 // --- Constants ---
 const VIOLATION_TYPES = [
-  "Unzipped Jumpsuit (Serious)", "Wearing Makeup/Cosmetics", "Exposed Hair/Hijab",
-  "Eating/Drinking in CR", "Unauthorized Item (Cardboard/Pouch)", "Sitting on Floor (No Mat)", "Other"
+  "Unzipped Jumpsuit (Serious)", 
+  "Not wearing facemask properly", // UPDATED: Added new violation type
+  "Wearing Makeup/Cosmetics", 
+  "Exposed Hair/Hijab",
+  "Eating/Drinking in CR", 
+  "Unauthorized Item (Cardboard/Pouch)", 
+  "Sitting on Floor (No Mat)", 
+  "Other"
 ];
 const CLEANROOM_LEVELS = ["L1", "L2", "L3"];
 const ACTIONS = ["Verbal Warning", "Written Warning", "Final Warning", "Cleanroom Ban"];
@@ -71,8 +77,9 @@ export default function App() {
   const [isEditing, setIsEditing] = useState(false);
   const [editId, setEditId] = useState(null);
 
+  // UPDATED: Added hostName to state
   const [formData, setFormData] = useState({
-    name: '', badgeId: '', department: '', cleanroomLevel: CLEANROOM_LEVELS[0],
+    name: '', badgeId: '', department: '', hostName: '', cleanroomLevel: CLEANROOM_LEVELS[0],
     enforcerName: '', violationType: VIOLATION_TYPES[0], description: '',
     actionTaken: ACTIONS[0], status: "", photoPlaceholder: false, violationDate: '' 
   });
@@ -96,7 +103,6 @@ export default function App() {
       items.sort((a, b) => b.timestamp - a.timestamp);
       setViolations(items);
       
-      // Auto-refresh selected violation if it exists in the new data
       if (selectedViolation) {
         const updatedRecord = items.find(i => i.id === selectedViolation.id);
         if (updatedRecord) {
@@ -132,12 +138,13 @@ export default function App() {
       name: violation.name,
       badgeId: violation.badgeId,
       department: violation.department || '',
+      hostName: violation.hostName || '', // Load hostName
       cleanroomLevel: violation.cleanroomLevel || CLEANROOM_LEVELS[0],
       enforcerName: violation.enforcerName,
       violationType: violation.violationType || VIOLATION_TYPES[0],
       description: violation.description,
       actionTaken: violation.actionTaken || ACTIONS[0],
-      status: violation.status, // Load current status for correction
+      status: violation.status, 
       photoPlaceholder: violation.statusHistory?.[0]?.hasFile || false, 
       violationDate: violation.violationDate
     });
@@ -157,12 +164,13 @@ export default function App() {
            name: formData.name,
            badgeId: formData.badgeId,
            department: formData.department,
+           hostName: formData.hostName, // Update hostName
            cleanroomLevel: formData.cleanroomLevel,
            enforcerName: formData.enforcerName,
            violationType: formData.violationType,
            description: formData.description,
            actionTaken: formData.actionTaken,
-           status: formData.status, // Update current status (correction)
+           status: formData.status, 
            violationDate: formData.violationDate
         });
         setIsEditing(false);
@@ -202,7 +210,7 @@ export default function App() {
 
   const resetForm = () => {
     const now = new Date(); now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
-    setFormData({ name: '', badgeId: '', department: '', cleanroomLevel: CLEANROOM_LEVELS[0], enforcerName: '', violationType: VIOLATION_TYPES[0], description: '', actionTaken: ACTIONS[0], status: "", photoPlaceholder: false, violationDate: now.toISOString().slice(0, 16) });
+    setFormData({ name: '', badgeId: '', department: '', hostName: '', cleanroomLevel: CLEANROOM_LEVELS[0], enforcerName: '', violationType: VIOLATION_TYPES[0], description: '', actionTaken: ACTIONS[0], status: "", photoPlaceholder: false, violationDate: now.toISOString().slice(0, 16) });
     setIsEditing(false);
     setEditId(null);
   };
@@ -393,14 +401,19 @@ export default function App() {
                         <p className="text-xs text-slate-600 leading-relaxed italic">"{selectedViolation.description}"</p>
                       </div>
                     </div>
+                    
+                    {/* Display Host Name in Details if available */}
+                    {selectedViolation.hostName && (
+                      <div>
+                         <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Host's Name (Vendor)</label>
+                         <p className="text-sm font-bold text-slate-700">{selectedViolation.hostName}</p>
+                      </div>
+                    )}
 
                     <div>
                       <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Workflow Actions</label>
                       <div className="space-y-2">
                         {STATUSES.map(s => {
-                          // Logic for highlighting the selected status button
-                          // Highlights if it matches the current pending selection (prioritized) 
-                          // OR if it matches the current status AND no pending selection is made
                           const isSelected = pendingStatus ? pendingStatus === s.id : selectedViolation.status === s.id;
                           return (
                             <button 
@@ -476,10 +489,15 @@ export default function App() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 gap-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                   <div className="space-y-2">
                     <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Department/Company(Vendor)</label>
                     <input required name="department" value={formData.department} onChange={handleInputChange} className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-xl focus:border-indigo-500 outline-none transition-all" />
+                  </div>
+                   {/* UPDATED: Added Host's Name field (Removed "Optional" placeholder) */}
+                  <div className="space-y-2">
+                    <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Host's Name(For vendor)</label>
+                    <input name="hostName" value={formData.hostName} onChange={handleInputChange} className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-xl focus:border-indigo-500 outline-none transition-all" />
                   </div>
                 </div>
 
@@ -584,11 +602,11 @@ function PrintableReport({ data }) {
         <p className="text-sm text-gray-500 mt-1">Cleanroom Protocol Enforcing Committee (MF3)</p>
       </div>
       <div className="flex justify-between items-end mb-8 text-sm"><div><span className="font-bold text-gray-500 uppercase">Case Reference ID:</span><div className="font-mono text-lg font-bold text-gray-900">{data.caseId || data.id}</div></div><div className="text-right"><span className="font-bold text-gray-500 uppercase">Report Generated:</span><div className="text-gray-900">{new Date().toLocaleString()}</div></div></div>
-      <div className="mb-8"><h3 className="bg-gray-100 border border-gray-300 px-4 py-2 font-bold text-sm uppercase text-gray-800 mb-4">A. Violator Information</h3><div className="grid grid-cols-2 gap-6"><div><label className="block text-xs font-bold text-gray-500 uppercase">Name</label><div className="border-b border-gray-300 py-1 text-gray-900 font-medium">{data.name}</div></div><div><label className="block text-xs font-bold text-gray-500 uppercase">Employee ID / IC / Passport</label><div className="border-b border-gray-300 py-1 text-gray-900 font-medium">{data.badgeId}</div></div><div className="col-span-2"><label className="block text-xs font-bold text-gray-500 uppercase">Department / Company (Vendor)</label><div className="border-b border-gray-300 py-1 text-gray-900 font-medium">{data.department}</div></div></div></div>
+      <div className="mb-8"><h3 className="bg-gray-100 border border-gray-300 px-4 py-2 font-bold text-sm uppercase text-gray-800 mb-4">A. Violator Information</h3><div className="grid grid-cols-2 gap-6"><div><label className="block text-xs font-bold text-gray-500 uppercase">Name</label><div className="border-b border-gray-300 py-1 text-gray-900 font-medium">{data.name}</div></div><div><label className="block text-xs font-bold text-gray-500 uppercase">Employee ID / IC / Passport</label><div className="border-b border-gray-300 py-1 text-gray-900 font-medium">{data.badgeId}</div></div><div><label className="block text-xs font-bold text-gray-500 uppercase">Department / Company (Vendor)</label><div className="border-b border-gray-300 py-1 text-gray-900 font-medium">{data.department}</div></div>{/* UPDATED: Added Host Name to report */}<div><label className="block text-xs font-bold text-gray-500 uppercase">Host's Name (Vendor)</label><div className="border-b border-gray-300 py-1 text-gray-900 font-medium">{data.hostName || '-'}</div></div></div></div>
       <div className="mb-8"><h3 className="bg-gray-100 border border-gray-300 px-4 py-2 font-bold text-sm uppercase text-gray-800 mb-4">B. Violation Particulars</h3><div className="grid grid-cols-2 gap-6 mb-4"><div><label className="block text-xs font-bold text-gray-500 uppercase">Date & Time of Violation</label><div className="border-b border-gray-300 py-1 text-gray-900">{data.violationDate ? new Date(data.violationDate).toLocaleString() : 'N/A'}</div></div><div><label className="block text-xs font-bold text-gray-500 uppercase">Reported By (Enforcer)</label><div className="border-b border-gray-300 py-1 text-gray-900">{data.enforcerName}</div></div></div><div className="grid grid-cols-2 gap-6 mb-4"><div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">Violation Type</label><div className="p-2 border border-red-200 bg-red-50 text-red-800 font-bold rounded text-sm inline-block">{data.violationType}</div></div><div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">Cleanroom Level</label><div className="p-2 border border-blue-200 bg-blue-50 text-blue-800 font-bold rounded text-sm inline-block">MF3 Cleanroom - {data.cleanroomLevel || 'N/A'}</div></div></div><div className="mb-4"><label className="block text-xs font-bold text-gray-500 uppercase mb-1">Action Taken</label><div className="border-b border-gray-300 py-1 text-gray-900 font-medium">{data.actionTaken}</div></div><div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">Description of Incident</label><div className="p-4 border border-gray-300 rounded bg-gray-50 text-gray-800 text-sm leading-relaxed min-h-[80px]">{data.description}</div></div></div>
       <div className="mb-8 avoid-break">
         <h3 className="bg-gray-100 border border-gray-300 px-4 py-2 font-bold text-sm uppercase text-gray-800 mb-4">C. Remarks</h3>
-        {/* UPDATED: Green Box for Remarks */}
+        {/* Green Box for Remarks */}
         <div className="border-2 border-green-200 border-dashed rounded p-6 bg-green-50 text-center">
             <p className="text-green-800 font-medium italic">
                 "Photographic evidence may available in SharePoint folder, please contact MF3 Cleanroom Protocol Enforcing Committee to view it"
