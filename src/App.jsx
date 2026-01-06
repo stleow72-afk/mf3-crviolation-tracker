@@ -36,7 +36,7 @@ const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 // --- Constants ---
 const VIOLATION_TYPES = [
   "Unzipped Jumpsuit (Serious)", 
-  "Not wearing facemask properly", // UPDATED: Added new violation type
+  "Not wearing facemask properly",
   "Wearing Makeup/Cosmetics", 
   "Exposed Hair/Hijab",
   "Eating/Drinking in CR", 
@@ -77,10 +77,13 @@ export default function App() {
   const [isEditing, setIsEditing] = useState(false);
   const [editId, setEditId] = useState(null);
 
-  // UPDATED: Added hostName to state
+  // UPDATED: Changed defaults for cleanroomLevel and violationType to "" (empty string)
   const [formData, setFormData] = useState({
-    name: '', badgeId: '', department: '', hostName: '', cleanroomLevel: CLEANROOM_LEVELS[0],
-    enforcerName: '', violationType: VIOLATION_TYPES[0], description: '',
+    name: '', badgeId: '', department: '', hostName: '', 
+    cleanroomLevel: "", // Default empty to show placeholder
+    enforcerName: '', 
+    violationType: "", // Default empty to show placeholder
+    description: '',
     actionTaken: ACTIONS[0], status: "", photoPlaceholder: false, violationDate: '' 
   });
 
@@ -138,10 +141,10 @@ export default function App() {
       name: violation.name,
       badgeId: violation.badgeId,
       department: violation.department || '',
-      hostName: violation.hostName || '', // Load hostName
-      cleanroomLevel: violation.cleanroomLevel || CLEANROOM_LEVELS[0],
+      hostName: violation.hostName || '', 
+      cleanroomLevel: violation.cleanroomLevel || "",
       enforcerName: violation.enforcerName,
-      violationType: violation.violationType || VIOLATION_TYPES[0],
+      violationType: violation.violationType || "",
       description: violation.description,
       actionTaken: violation.actionTaken || ACTIONS[0],
       status: violation.status, 
@@ -164,7 +167,7 @@ export default function App() {
            name: formData.name,
            badgeId: formData.badgeId,
            department: formData.department,
-           hostName: formData.hostName, // Update hostName
+           hostName: formData.hostName, 
            cleanroomLevel: formData.cleanroomLevel,
            enforcerName: formData.enforcerName,
            violationType: formData.violationType,
@@ -210,7 +213,8 @@ export default function App() {
 
   const resetForm = () => {
     const now = new Date(); now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
-    setFormData({ name: '', badgeId: '', department: '', hostName: '', cleanroomLevel: CLEANROOM_LEVELS[0], enforcerName: '', violationType: VIOLATION_TYPES[0], description: '', actionTaken: ACTIONS[0], status: "", photoPlaceholder: false, violationDate: now.toISOString().slice(0, 16) });
+    // UPDATED: Reset cleanroomLevel and violationType to ""
+    setFormData({ name: '', badgeId: '', department: '', hostName: '', cleanroomLevel: "", enforcerName: '', violationType: "", description: '', actionTaken: ACTIONS[0], status: "", photoPlaceholder: false, violationDate: now.toISOString().slice(0, 16) });
     setIsEditing(false);
     setEditId(null);
   };
@@ -504,13 +508,15 @@ export default function App() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                    <div className="space-y-2">
                     <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Cleanroom Level</label>
-                    <select name="cleanroomLevel" value={formData.cleanroomLevel} onChange={handleInputChange} className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-xl focus:border-indigo-500 outline-none transition-all appearance-none">
+                    <select required name="cleanroomLevel" value={formData.cleanroomLevel} onChange={handleInputChange} className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-xl focus:border-indigo-500 outline-none transition-all appearance-none">
+                      <option value="" disabled>Please select Cleanroom</option>
                       {CLEANROOM_LEVELS.map(l => <option key={l} value={l}>MF3 - Level {l}</option>)}
                     </select>
                   </div>
                   <div className="space-y-2">
                     <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Violation Type</label>
-                    <select name="violationType" value={formData.violationType} onChange={handleInputChange} className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-xl focus:border-indigo-500 outline-none transition-all appearance-none">
+                    <select required name="violationType" value={formData.violationType} onChange={handleInputChange} className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-xl focus:border-indigo-500 outline-none transition-all appearance-none">
+                      <option value="" disabled>Please select a violation type</option>
                       {VIOLATION_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                     </select>
                   </div>
