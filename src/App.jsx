@@ -302,7 +302,8 @@ export default function App() {
               </div>
             </div>
             <div className="flex-1 overflow-y-auto p-8 bg-gray-100 pb-20">
-              <div className="shadow-lg bg-white mx-auto w-[210mm] h-[297mm] overflow-hidden">
+              {/* Preview container handles scrolling for multi-page report */}
+              <div className="shadow-lg bg-gray-50 mx-auto w-fit">
                 <PrintableReport data={selectedViolation} />
               </div>
             </div>
@@ -597,6 +598,10 @@ export default function App() {
             print-color-adjust: exact;
             -webkit-print-color-adjust: exact;
           }
+          .page-break {
+            page-break-before: always;
+            break-before: page;
+          }
         }
       `}</style>
     </div>
@@ -612,101 +617,138 @@ function StatusBadge({ id }) {
   );
 }
 
-// Updated PrintableReport to fit on one A4 page
+// Updated PrintableReport for 2 pages: Page 1 (Main), Page 2 (History)
 function PrintableReport({ data }) {
   if (!data) return null;
+  const getStatusLabel = (id) => STATUSES.find(s => s.id === id)?.label || id;
+
   return (
-    <div style={{ fontFamily: 'Arial, sans-serif' }} className="w-[210mm] h-[297mm] mx-auto bg-white border border-gray-300 relative print:border-none print:shadow-none box-border p-8">
-      {/* Header */}
-      <div className="text-center border-b-2 border-gray-800 pb-4 mb-6">
-        <div className="flex justify-center items-center mb-2">
-          <Shield className="h-8 w-8 text-blue-800 mr-2" />
-          <h1 className="text-2xl font-bold uppercase tracking-widest text-blue-800">Confidential</h1>
-        </div>
-        <h2 className="text-lg font-bold uppercase text-blue-800">Cleanroom Protocol Violation Report</h2>
-        <p className="text-xs text-gray-500 mt-1">Cleanroom Protocol Enforcing Committee (MF3)</p>
-      </div>
+    <div style={{ fontFamily: 'Arial, sans-serif' }}>
       
-      {/* Meta Data */}
-      <div className="flex justify-between items-end mb-6 text-xs">
-        <div>
-          <span className="font-bold text-gray-500 uppercase">Case Reference ID:</span>
-          <div className="font-mono text-base font-bold text-gray-900">{data.caseId || data.id}</div>
+      {/* --- PAGE 1: Main Report --- */}
+      <div className="w-[210mm] h-[297mm] mx-auto bg-white border border-gray-300 relative print:border-none print:shadow-none box-border p-8 mb-8 print:mb-0">
+        {/* Header */}
+        <div className="text-center border-b-2 border-gray-800 pb-4 mb-6">
+          <div className="flex justify-center items-center mb-2">
+            <Shield className="h-8 w-8 text-blue-800 mr-2" />
+            <h1 className="text-2xl font-bold uppercase tracking-widest text-blue-800">Confidential</h1>
+          </div>
+          <h2 className="text-lg font-bold uppercase text-blue-800">Cleanroom Protocol Violation Report</h2>
+          <p className="text-xs text-gray-500 mt-1">Cleanroom Protocol Enforcing Committee (MF3)</p>
         </div>
-        <div className="text-right">
-          <span className="font-bold text-gray-500 uppercase">Report Generated:</span>
-          <div className="text-gray-900">{new Date().toLocaleString()}</div>
+        
+        {/* Meta Data */}
+        <div className="flex justify-between items-end mb-6 text-xs">
+          <div>
+            <span className="font-bold text-gray-500 uppercase">Case Reference ID:</span>
+            <div className="font-mono text-base font-bold text-gray-900">{data.caseId || data.id}</div>
+          </div>
+          <div className="text-right">
+            <span className="font-bold text-gray-500 uppercase">Report Generated:</span>
+            <div className="text-gray-900">{new Date().toLocaleString()}</div>
+          </div>
         </div>
-      </div>
-      
-      {/* Section A: Violator Info */}
-      <div className="mb-6">
-        <h3 className="bg-gray-100 border border-gray-300 px-3 py-1.5 font-bold text-xs uppercase text-gray-800 mb-3">A. Violator Information</h3>
-        <div className="grid grid-cols-2 gap-4">
-          <div><label className="block text-[10px] font-bold text-gray-500 uppercase">Name</label><div className="border-b border-gray-300 py-0.5 text-sm text-gray-900 font-medium">{data.name}</div></div>
-          <div><label className="block text-[10px] font-bold text-gray-500 uppercase">Employee ID / IC / Passport</label><div className="border-b border-gray-300 py-0.5 text-sm text-gray-900 font-medium">{data.badgeId}</div></div>
-          <div><label className="block text-[10px] font-bold text-gray-500 uppercase">Department / Company</label><div className="border-b border-gray-300 py-0.5 text-sm text-gray-900 font-medium">{data.department}</div></div>
-          <div><label className="block text-[10px] font-bold text-gray-500 uppercase">Host's Name (Vendor)</label><div className="border-b border-gray-300 py-0.5 text-sm text-gray-900 font-medium">{data.hostName || '-'}</div></div>
+        
+        {/* Section A: Violator Info */}
+        <div className="mb-6">
+          <h3 className="bg-gray-100 border border-gray-300 px-3 py-1.5 font-bold text-xs uppercase text-gray-800 mb-3">A. Violator Information</h3>
+          <div className="grid grid-cols-2 gap-4">
+            <div><label className="block text-[10px] font-bold text-gray-500 uppercase">Name</label><div className="border-b border-gray-300 py-0.5 text-sm text-gray-900 font-medium">{data.name}</div></div>
+            <div><label className="block text-[10px] font-bold text-gray-500 uppercase">Employee ID / IC / Passport</label><div className="border-b border-gray-300 py-0.5 text-sm text-gray-900 font-medium">{data.badgeId}</div></div>
+            <div><label className="block text-[10px] font-bold text-gray-500 uppercase">Department / Company</label><div className="border-b border-gray-300 py-0.5 text-sm text-gray-900 font-medium">{data.department}</div></div>
+            <div><label className="block text-[10px] font-bold text-gray-500 uppercase">Host's Name (Vendor)</label><div className="border-b border-gray-300 py-0.5 text-sm text-gray-900 font-medium">{data.hostName || '-'}</div></div>
+          </div>
+        </div>
+
+        {/* Section B: Violation Particulars */}
+        <div className="mb-6">
+          <h3 className="bg-gray-100 border border-gray-300 px-3 py-1.5 font-bold text-xs uppercase text-gray-800 mb-3">B. Violation Particulars</h3>
+          <div className="grid grid-cols-2 gap-4 mb-3">
+            <div><label className="block text-[10px] font-bold text-gray-500 uppercase">Date & Time of Violation</label><div className="border-b border-gray-300 py-0.5 text-sm text-gray-900">{data.violationDate ? new Date(data.violationDate).toLocaleString() : 'N/A'}</div></div>
+            <div><label className="block text-[10px] font-bold text-gray-500 uppercase">Reported By (Enforcer)</label><div className="border-b border-gray-300 py-0.5 text-sm text-gray-900">{data.enforcerName}</div></div>
+          </div>
+          <div className="grid grid-cols-2 gap-4 mb-3">
+            <div><label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Violation Type</label><div className="px-2 py-1 border border-red-200 bg-red-50 text-red-800 font-bold rounded text-xs inline-block">{data.violationType}</div></div>
+            <div><label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Cleanroom Level</label><div className="px-2 py-1 border border-blue-200 bg-blue-50 text-blue-800 font-bold rounded text-xs inline-block">MF3 Cleanroom - {data.cleanroomLevel || 'N/A'}</div></div>
+          </div>
+          <div className="mb-3">
+            <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Action Taken</label>
+            <div className="border-b border-gray-300 py-0.5 text-sm text-gray-900 font-medium">{data.actionTaken}</div>
+          </div>
+          <div>
+            <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Description of Incident</label>
+            <div className="p-3 border border-gray-300 rounded bg-gray-50 text-gray-800 text-sm leading-relaxed min-h-[60px]">{data.description}</div>
+          </div>
+        </div>
+        
+        {/* Section C: Remarks */}
+        <div className="mb-6">
+          <h3 className="bg-gray-100 border border-gray-300 px-3 py-1.5 font-bold text-xs uppercase text-gray-800 mb-3">C. Remarks</h3>
+          <div className="border-2 border-green-200 border-dashed rounded p-4 bg-green-50 text-center">
+              <p className="text-green-800 text-xs font-medium italic">
+                  "Photographic evidence may be available in SharePoint folder, please contact MF3 Cleanroom Protocol Enforcing Committee to view it"
+              </p>
+          </div>
+        </div>
+        
+        {/* Signatures - Pinned to bottom area */}
+        <div className="absolute bottom-12 left-8 right-8">
+          <div className="pt-4 border-t-2 border-gray-200">
+            <div className="grid grid-cols-3 gap-8">
+              <div className="text-center">
+                <div className="h-16 border-b border-gray-400 mb-2"></div>
+                <div className="text-[10px] font-bold uppercase text-gray-500">Violator Signature</div>
+                <div className="text-[9px] text-gray-400">Acknowledging Violation</div>
+              </div>
+              <div className="text-center">
+                <div className="h-16 border-b border-gray-400 mb-2"></div>
+                <div className="text-[10px] font-bold uppercase text-gray-500">Enforcer Signature</div>
+                <div className="text-[9px] text-gray-400">Verifying Report</div>
+              </div>
+              <div className="text-center">
+                <div className="h-16 border-b border-gray-400 mb-2"></div>
+                <div className="text-[10px] font-bold uppercase text-gray-500">Manager / HOD</div>
+                <div className="text-[9px] text-gray-400">Acknowledging Receipt</div>
+              </div>
+            </div>
+          </div>
+          <div className="mt-6 text-center text-[9px] text-gray-400">
+            <p>Page 1 - Incident Report</p>
+            <p>Strictly Confidential. For Internal Use Only.</p>
+          </div>
         </div>
       </div>
 
-      {/* Section B: Violation Particulars */}
-      <div className="mb-6">
-        <h3 className="bg-gray-100 border border-gray-300 px-3 py-1.5 font-bold text-xs uppercase text-gray-800 mb-3">B. Violation Particulars</h3>
-        <div className="grid grid-cols-2 gap-4 mb-3">
-          <div><label className="block text-[10px] font-bold text-gray-500 uppercase">Date & Time of Violation</label><div className="border-b border-gray-300 py-0.5 text-sm text-gray-900">{data.violationDate ? new Date(data.violationDate).toLocaleString() : 'N/A'}</div></div>
-          <div><label className="block text-[10px] font-bold text-gray-500 uppercase">Reported By (Enforcer)</label><div className="border-b border-gray-300 py-0.5 text-sm text-gray-900">{data.enforcerName}</div></div>
-        </div>
-        <div className="grid grid-cols-2 gap-4 mb-3">
-          <div><label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Violation Type</label><div className="px-2 py-1 border border-red-200 bg-red-50 text-red-800 font-bold rounded text-xs inline-block">{data.violationType}</div></div>
-          <div><label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Cleanroom Level</label><div className="px-2 py-1 border border-blue-200 bg-blue-50 text-blue-800 font-bold rounded text-xs inline-block">MF3 Cleanroom - {data.cleanroomLevel || 'N/A'}</div></div>
-        </div>
-        <div className="mb-3">
-          <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Action Taken</label>
-          <div className="border-b border-gray-300 py-0.5 text-sm text-gray-900 font-medium">{data.actionTaken}</div>
-        </div>
-        <div>
-          <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Description of Incident</label>
-          <div className="p-3 border border-gray-300 rounded bg-gray-50 text-gray-800 text-sm leading-relaxed min-h-[60px]">{data.description}</div>
-        </div>
-      </div>
-      
-      {/* Section C: Remarks */}
-      <div className="mb-6">
-        <h3 className="bg-gray-100 border border-gray-300 px-3 py-1.5 font-bold text-xs uppercase text-gray-800 mb-3">C. Remarks</h3>
-        <div className="border-2 border-green-200 border-dashed rounded p-4 bg-green-50 text-center">
-            <p className="text-green-800 text-xs font-medium italic">
-                "Photographic evidence may be available in SharePoint folder, please contact MF3 Cleanroom Protocol Enforcing Committee to view it"
-            </p>
-        </div>
-      </div>
-      
-      {/* Signatures - Pinned to bottom area */}
-      <div className="absolute bottom-12 left-8 right-8">
-        <div className="pt-4 border-t-2 border-gray-200">
-          <div className="grid grid-cols-3 gap-8">
-            <div className="text-center">
-              <div className="h-16 border-b border-gray-400 mb-2"></div>
-              <div className="text-[10px] font-bold uppercase text-gray-500">Violator Signature</div>
-              <div className="text-[9px] text-gray-400">Acknowledging Violation</div>
-            </div>
-            <div className="text-center">
-              <div className="h-16 border-b border-gray-400 mb-2"></div>
-              <div className="text-[10px] font-bold uppercase text-gray-500">Enforcer Signature</div>
-              <div className="text-[9px] text-gray-400">Verifying Report</div>
-            </div>
-            <div className="text-center">
-              <div className="h-16 border-b border-gray-400 mb-2"></div>
-              <div className="text-[10px] font-bold uppercase text-gray-500">Manager / HOD</div>
-              <div className="text-[9px] text-gray-400">Acknowledging Receipt</div>
-            </div>
+      {/* --- PAGE 2: Timeline History --- */}
+      <div className="w-[210mm] min-h-[297mm] mx-auto bg-white border border-gray-300 print:border-none print:shadow-none box-border p-8 page-break">
+          <div className="text-center border-b-2 border-gray-800 pb-4 mb-8">
+            <h2 className="text-lg font-bold uppercase text-blue-800">Appendix: Case Timeline</h2>
+            <p className="text-xs text-gray-500 mt-1">Audit Trail for Case #{data.caseId || data.id}</p>
           </div>
-        </div>
-        <div className="mt-6 text-center text-[9px] text-gray-400">
-          <p>This document is generated by the MF3 Cleanroom Protocol Enforcement System.</p>
-          <p>Strictly Confidential. For Internal Use Only.</p>
-        </div>
+
+          <div className="space-y-0 border-l-2 border-gray-200 ml-4">
+             {data.statusHistory?.slice().reverse().map((h, i) => (
+                 <div key={i} className="relative pl-8 pb-8 avoid-break">
+                    {/* Dot */}
+                    <div className="absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-white border-4 border-blue-800" />
+                    
+                    <div className="text-xs font-bold text-gray-500 uppercase mb-1">{new Date(h.timestamp).toLocaleString()}</div>
+                    <div className="text-sm font-bold text-gray-900 uppercase mb-1">{getStatusLabel(h.status)}</div>
+                    {h.note && (
+                        <div className="bg-gray-50 p-3 rounded border border-gray-200 text-xs italic text-gray-600">
+                            {h.note}
+                        </div>
+                    )}
+                 </div>
+             ))}
+          </div>
+          
+          <div className="mt-auto text-center text-[9px] text-gray-400 pt-8">
+             <p>Page 2 - Timeline History</p>
+             <p>MF3 Cleanroom Protocol Enforcement System</p>
+          </div>
       </div>
+
     </div>
   );
 }
